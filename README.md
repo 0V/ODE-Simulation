@@ -1,4 +1,4 @@
 ODE-Simulation
 ==============
 
-Open Dynamics Engine でいろいろとシミュレーション。ODE　no練習も兼ねて
+Open Dynamics Engine でいろいろとシミュレーション。 ODE の練習も兼ねて
