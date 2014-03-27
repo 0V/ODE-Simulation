@@ -25,20 +25,23 @@ dSpaceID space;
 dGeomID ground;
 list<dJointID> joint;
 dJointGroupID contactgroup;
-const dReal ANGLE = 0.4;							// ヒンジの曲がる角度
-const dReal m = 0.001, r = 0.025, l = 0.1;			// m 質量  r 半径  l 長さ
-float xyz[] = { 0.0, 0.0, 2.0 };					// 視点　位置
-float hpr[] = { -180, 0.0, 0.0 };					// 視点　方向
-dsFunctions fn;										// DrawStuff 用の構造体
-static int counter = 0;								// ループ回数カウント用
+const dReal ANGLE = 0.4;		// ヒンジの曲がる角度
+//const dReal m = 0.001, r = 0.025, l = 0.1;			// m 質量  r 半径  l 長さ
+const dReal m = 1, r = 2.5, l = 10;					// m 質量  r 半径  l 長さ
+const dReal x = 0.0, y = 0.0, z = 300.0;		// 物体の初期位置
+float xyz[] = { 0.0, 50.0, 2.0 };				// 視点　位置
+float hpr[] = { -90, 0.0, 0.0 };				// 視点　方向
+dsFunctions fn;					// DrawStuff 用の構造体
+static int counter = 0;			// ループ回数カウント用
 
 typedef struct{
 	dBodyID body;
 	dGeomID geom;
 	dReal r, m, l, side[3], target;
-}dObject;											// 物体を表す構造体 r:半径 m:質量 l:長さ target:目標の角度
+	float rgb[3];
+}dObject;				// 物体を表す構造体 r:半径 m:質量 l:長さ target:目標の角度 rgb:RGBを0~1で表現
 
-static list<dObject> leg;							// 体のパーツを入れるためのリスト
+static list<dObject> leg;		// 体のパーツを入れるためのリスト
 
 // Mersenne twister による一様な擬似乱数生成
 double getUniformRand(){
@@ -67,7 +70,7 @@ static void nearCallBack(void *data, dGeomID o1, dGeomID o2){
 	}
 }
 
-// dObject 構造体のリストの target にランダムな値を代入
+// list<dObject> 要素の target にランダムな値を代入
 static void setRandomTarget(list<dObject> *obj){
 	list<dObject>::iterator it = obj->begin();
 	for (unsigned int i = 0; i < obj->size(); i++){
@@ -77,7 +80,7 @@ static void setRandomTarget(list<dObject> *obj){
 	}
 }
 
-// list<dObject> 要素のターゲットの値を全て指定した値にする
+// list<dObject> 要素の target の値を全て指定した値にする
 static void setTarget(list<dObject> *obj,dReal size){
 	list<dObject>::iterator it = obj->begin();
 	for (unsigned int i = 0; i < obj->size(); i++){
@@ -113,7 +116,7 @@ static void makeSnakebot(list<dObject> *leg, list<dJointID> *jlist){
 	static list<dObject>::iterator it2 = leg->begin(); // イテレータ
 	it2++;
 
-	dReal x0 = 0.0, y0 = 0.0, z0 = 3.0;
+	dReal x0 =  x, y0 = y, z0 = z;
 	dBodySetPosition(it->body, x0, y0, z0);
 
 	for (unsigned int i = 0; i < leg->size() - 1; i++)
@@ -159,6 +162,18 @@ static void start(){
 	dsSetViewpoint(xyz, hpr);
 }
 
+// ボディの色をランダムに作成
+static void startColorRand(){
+	dsSetViewpoint(xyz, hpr);
+	list<dObject>::iterator it = leg.begin();
+	for (int i = 0; i < leg.size(); i++){
+		it->rgb[0] = getUniformRand();
+		it->rgb[1] = getUniformRand();
+		it->rgb[2] = getUniformRand();
+		it++;
+	}
+}
+
 // 衝突用空間の生成と設定
 static void makeSpace(){
 	space = dHashSpaceCreate(0);
@@ -171,7 +186,7 @@ static void simLoop(int pause){
 	counter++;
 	dSpaceCollide(space, 0, nearCallBack);	//衝突計算
 
-	if (counter > 200){						//この値を変えれば蛇が動く間隔を変えられる
+	if (counter > 200){				//この値を変えれば蛇が動く間隔を変えられる
 		setRandomTarget(&leg);
 		counter = 0;
 	}
@@ -188,10 +203,91 @@ static void simLoop(int pause){
 	}
 }
 
+// ボディが気持ち悪い色がいいならこちらを setDrawStuff に
+static void simLoopColorRand(int pause){
+	counter++;
+	dSpaceCollide(space, 0, nearCallBack);		//衝突計算
+
+	if (counter > 200){				//この値を変えれば蛇が動く間隔を変えられる
+		setRandomTarget(&leg);
+		counter = 0;
+	}
+
+	controlHinge(joint, leg);
+
+	dWorldStep(world, 0.01);
+	dJointGroupEmpty(contactgroup);
+
+	for each (dObject var in leg)
+	{
+		dsSetColor(var.rgb[0], var.rgb[1], var.rgb[2]);	// 色
+		dsDrawCapsule(dBodyGetPosition(var.body), dBodyGetRotation(var.body), var.l, var.r);
+	}
+}
+
+// 一フレームごとに色描写ランダム
+static void simLoopColorRand2(int pause){
+	counter++;
+	dSpaceCollide(space, 0, nearCallBack);	//衝突計算
+
+	if (counter > 200){				//この値を変えれば蛇が動く間隔を変えられる
+		setRandomTarget(&leg);
+		counter = 0;
+	}
+
+	controlHinge(joint, leg);
+
+	dWorldStep(world, 0.01);
+	dJointGroupEmpty(contactgroup);
+
+	for each (dObject var in leg)
+	{
+		dsSetColor(getUniformRand(), getUniformRand(), getUniformRand());				// 色
+		dsDrawCapsule(dBodyGetPosition(var.body), dBodyGetRotation(var.body), var.l, var.r);
+	}
+}
+
+static int countcolor = 0;
+
+// 指定フレームごとに色描写ランダム
+static void simLoopColorRand3(int pause){
+	counter++;
+	dSpaceCollide(space, 0, nearCallBack);	//衝突計算
+
+	if (counter > 200){				//この値を変えれば蛇が動く間隔を変えられる
+		setRandomTarget(&leg);
+		counter = 0;
+	}
+
+	controlHinge(joint, leg);
+
+	dWorldStep(world, 0.01);
+	dJointGroupEmpty(contactgroup);
+	
+	countcolor++;
+
+	if (countcolor>30){					//色変更の周期を設定
+		countcolor = 0;
+		list<dObject>::iterator it = leg.begin();
+		for (int i = 0; i < leg.size(); i++){
+			it->rgb[0] = getUniformRand();
+			it->rgb[1] = getUniformRand();
+			it->rgb[2] = getUniformRand();
+			it++;
+		}
+	}
+
+	for each (dObject var in leg)
+	{
+		dsSetColor(var.rgb[0], var.rgb[1], var.rgb[2]);
+		dsDrawCapsule(dBodyGetPosition(var.body), dBodyGetRotation(var.body), var.l, var.r);
+	}
+}
+
 // DrawStuff の初期設定
 static void setDrawStuff(){
 	fn.version = DS_VERSION;
-	fn.start = &start;
+	fn.start = &startColorRand;
 	fn.step = &simLoop;
 	fn.path_to_textures = "../../drawstuff/textures";
 }
@@ -205,10 +301,10 @@ int main(int args, char **argv){
 	dWorldSetGravity(world, 0.0, 0.0, -9.8);
 
 	makeSpace();
-	makeCapsule(&leg, 20);							// 指定した数だけカプセルを作成
+	makeCapsule(&leg, 20);						// 指定した数だけカプセルを作成
 	makeSnakebot(&leg, &joint);						// 蛇型にヒンジを取り付ける
 
-	setTarget(&leg, 0);								// ヒンジを曲げる目標の角度を 0 に初期化
+	setTarget(&leg, 0);						// ヒンジを曲げる目標の角度を 0 に初期化
 
 	dsSimulationLoop(args, argv, 1200, 800, &fn);
 	dWorldDestroy(world);
